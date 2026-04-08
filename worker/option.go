@@ -1,15 +1,15 @@
 package worker
 
 import (
-	"github.com/thkx/agent/graph"
 	"github.com/thkx/agent/queue"
+	"github.com/thkx/agent/runtime"
 )
 
 type Option func(*Worker)
 
-func WithGraphProvider(f func() *graph.Graph) Option {
+func WithGraphStore(s runtime.GraphStore) Option {
 	return func(e *Worker) {
-		e.graphProvider = f
+		e.graphStore = s
 	}
 }
 

@@ -46,10 +46,9 @@ func (a *Agent) Run(ctx context.Context, input string) (string, error) {
 	}
 
 	execID := uuid.New().String()
+	g := a.buildGraph()
 
-	a.rt.SetGraph(a.buildGraph())
-
-	err := a.rt.Run(ctx, execID, state)
+	err := a.rt.Run(ctx, execID, g, state)
 	if err != nil {
 		return "", err
 	}

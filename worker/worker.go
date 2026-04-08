@@ -2,17 +2,18 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"github.com/thkx/agent/graph"
 	"github.com/thkx/agent/model"
 	"github.com/thkx/agent/queue"
+	"github.com/thkx/agent/runtime"
 )
 
 type Worker struct {
-	taskQueue     *queue.TaskQueue
-	resultQueue   *queue.ResultQueue
-	graphProvider func() *graph.Graph // 🔥 动态获取
+	taskQueue   *queue.TaskQueue
+	resultQueue *queue.ResultQueue
+	graphStore  runtime.GraphStore
 }
 
 func New(opts ...Option) *Worker {
@@ -27,32 +28,16 @@ func New(opts ...Option) *Worker {
 
 func (w *Worker) Start(ctx context.Context) {
 	for {
-		raw, err := w.taskQueue.Pop(ctx)
+		task, err := w.taskQueue.PopTask(ctx)
 		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, queue.ErrQueueClosed) {
+				return
+			}
 			fmt.Println(err)
 			return
 		}
-		task := raw.(*model.Task)
 
 		go w.processTask(ctx, task)
-		// g := w.graphProvider()
-		// if g == nil {
-		// 	panic("graph not set")
-		// }
-
-		// node, ok := g.GetNode(task.NodeName)
-		// if !ok {
-		// 	fmt.Printf("Warning: node not found: %s\n", task.NodeName)
-		// }
-
-		// newState, err := node.Execute(ctx, task.State)
-
-		// w.resultQueue.Push(ctx, &model.TaskResult{
-		// 	ExecutionID: task.ExecutionID,
-		// 	NodeName:    task.NodeName,
-		// 	State:       newState,
-		// 	Error:       err,
-		// })
 	}
 }
 
@@ -60,38 +45,58 @@ func (w *Worker) processTask(ctx context.Context, t *model.Task) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Worker panic:", r)
-			w.taskQueue.RetryTask(t)
+			if !w.taskQueue.RetryTask(t) {
+				_ = w.resultQueue.PushResult(ctx, &model.TaskResult{
+					ExecutionID: t.ExecutionID,
+					NodeName:    t.NodeName,
+					State:       t.State,
+					Error:       fmt.Errorf("worker panic: %v", r),
+				})
+			}
 		}
 	}()
 
-	g := w.graphProvider()
+	g, ok := w.graphStore.Load(t.ExecutionID)
+	if !ok || g == nil {
+		_ = w.resultQueue.PushResult(ctx, &model.TaskResult{
+			ExecutionID: t.ExecutionID,
+			NodeName:    t.NodeName,
+			State:       t.State,
+			Error:       errors.New("graph not found for execution"),
+		})
+		return
+	}
+
 	node, ok := g.GetNode(t.NodeName)
 	if !ok {
-		fmt.Println("Node not found:", t.NodeName)
+		_ = w.resultQueue.PushResult(ctx, &model.TaskResult{
+			ExecutionID: t.ExecutionID,
+			NodeName:    t.NodeName,
+			State:       t.State,
+			Error:       fmt.Errorf("node not found: %s", t.NodeName),
+		})
 		return
 	}
 
 	newState, err := node.Execute(ctx, t.State)
 	if err != nil {
 		fmt.Println("Task execution error:", err)
-		w.taskQueue.RetryTask(t)
-		return
-	}
+		if w.taskQueue.RetryTask(t) {
+			return
+		}
 
-	// 执行成功 ACK
-	nextNode, err := g.Next(t.NodeName, newState)
-	if err != nil || nextNode == "" {
 		_ = w.resultQueue.PushResult(ctx, &model.TaskResult{
 			ExecutionID: t.ExecutionID,
 			NodeName:    t.NodeName,
-			State:       newState,
-			Error:       nil,
+			State:       t.State,
+			Error:       err,
 		})
 		return
 	}
-	_ = w.taskQueue.PushTask(&model.Task{
+
+	_ = w.resultQueue.PushResult(ctx, &model.TaskResult{
 		ExecutionID: t.ExecutionID,
-		NodeName:    nextNode,
+		NodeName:    t.NodeName,
 		State:       newState,
 	})
 }

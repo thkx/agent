@@ -24,3 +24,9 @@ func WithCheckpoint(c checkpoint.Checkpointer) Option {
 		e.checkpoint = c
 	}
 }
+
+func WithGraphStore(s GraphStore) Option {
+	return func(e *Engine) {
+		e.graphStore = s
+	}
+}

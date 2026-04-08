@@ -17,12 +17,12 @@ func NewTaskQueue(size int) *TaskQueue {
 	}
 }
 
-func (q *TaskQueue) PushTask(t *model.Task) error {
-	return q.Push(context.Background(), t)
+func (q *TaskQueue) PushTask(ctx context.Context, t *model.Task) error {
+	return q.Push(ctx, t)
 }
 
-func (q *TaskQueue) PopTask() (*model.Task, error) {
-	v, err := q.Pop(context.Background())
+func (q *TaskQueue) PopTask(ctx context.Context) (*model.Task, error) {
+	v, err := q.Pop(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -33,10 +33,12 @@ func (q *TaskQueue) PopTask() (*model.Task, error) {
 	return t, nil
 }
 
-// Retry task
-func (q *TaskQueue) RetryTask(t *model.Task) {
+// RetryTask returns true when the task has been scheduled for retry.
+func (q *TaskQueue) RetryTask(t *model.Task) bool {
 	if t.Retry < model.MAX_RETRY {
 		t.Retry++
 		q.Queuer.(*MemoryQueue).Retry(t, t.Retry)
+		return true
 	}
+	return false
 }

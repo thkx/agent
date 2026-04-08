@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/thkx/agent/agent"
-	"github.com/thkx/agent/graph"
 	"github.com/thkx/agent/llm"
 	"github.com/thkx/agent/llm/ollama"
 	"github.com/thkx/agent/queue"
@@ -26,18 +25,18 @@ func main() {
 	sched := scheduler.New(taskQ)
 
 	// runtime
+	graphStore := runtime.NewMemoryGraphStore()
 	rt := runtime.New(
 		runtime.WithScheduler(sched),
 		runtime.WithResultQueue(resultQ),
+		runtime.WithGraphStore(graphStore),
 	)
 
 	// worker
 	w := worker.New(
 		worker.WithTaskQueue(taskQ),
 		worker.WithResultQueue(resultQ),
-		worker.WithGraphProvider(func() *graph.Graph {
-			return rt.GetGraph()
-		}),
+		worker.WithGraphStore(graphStore),
 	)
 
 	go w.Start(ctx)

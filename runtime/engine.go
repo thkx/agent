@@ -17,7 +17,7 @@ type (
 )
 
 type Engine struct {
-	graph       *graph.Graph
+	graphStore  GraphStore
 	scheduler   Scheduler
 	checkpoint  checkpoint.Checkpointer
 	resultQueue *queue.ResultQueue
@@ -36,6 +36,10 @@ func New(opts ...Option) *Engine {
 		e.checkpoint = checkpoint.NewNoopCheckpoint()
 	}
 
+	if e.graphStore == nil {
+		e.graphStore = NewMemoryGraphStore()
+	}
+
 	if e.scheduler == nil {
 		panic("scheduler required")
 	}
@@ -51,19 +55,16 @@ func (e *Engine) logTrace(node string, content string) {
 	e.trace = append(e.trace, fmt.Sprintf("%s: %s", node, content))
 }
 
-func (e *Engine) SetGraph(g *graph.Graph) {
-	e.graph = g
-}
-
-func (e *Engine) GetGraph() *graph.Graph {
-	return e.graph
-}
-
-func (e *Engine) Run(ctx context.Context, execID string, init *model.State) error {
+func (e *Engine) Run(ctx context.Context, execID string, g *graph.Graph, init *model.State) error {
+	if g == nil {
+		return fmt.Errorf("graph required")
+	}
+	e.graphStore.Save(execID, g)
+	defer e.graphStore.Delete(execID)
 
 	cp := e.checkpoint.Load(ctx, execID)
 
-	current := e.graph.Start()
+	current := g.Start()
 	state := init
 
 	if cp != nil {
@@ -92,16 +93,21 @@ func (e *Engine) Run(ctx context.Context, execID string, init *model.State) erro
 
 		e.checkpoint.Save(ctx, execID, res.NodeName, res.State)
 
-		if res.NodeName == e.graph.End() {
+		if res.NodeName == g.End() {
 			return nil
 		}
 
-		next, _ := e.graph.Next(res.NodeName, res.State)
+		next, err := g.Next(res.NodeName, res.State)
+		if err != nil {
+			return err
+		}
 
-		_ = e.scheduler.Schedule(ctx, &model.Task{
+		if err := e.scheduler.Schedule(ctx, &model.Task{
 			ExecutionID: execID,
 			NodeName:    next,
 			State:       res.State,
-		})
+		}); err != nil {
+			return err
+		}
 	}
 }
