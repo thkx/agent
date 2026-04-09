@@ -8,13 +8,13 @@ import (
 )
 
 type Scheduler struct {
-	queue queue.Queuer
+	taskQueue *queue.TaskQueue
 }
 
-func New(queue queue.Queuer) *Scheduler {
-	return &Scheduler{queue: queue}
+func New(taskQueue *queue.TaskQueue) *Scheduler {
+	return &Scheduler{taskQueue: taskQueue}
 }
 
-func (s *Scheduler) Schedule(ctx context.Context, task *model.Task) error {
-	return s.queue.Push(ctx, task)
+func (s *Scheduler) Submit(ctx context.Context, task *model.Task) error {
+	return s.taskQueue.PushTask(ctx, task)
 }

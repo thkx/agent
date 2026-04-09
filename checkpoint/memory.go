@@ -8,28 +8,28 @@ import (
 )
 
 type Store struct {
-	data map[string]*model.Task
+	data map[string]*model.ExecutionSnapshot
 	mu   sync.RWMutex
 }
 
 func New() *Store {
 	return &Store{
-		data: make(map[string]*model.Task),
+		data: make(map[string]*model.ExecutionSnapshot),
 	}
 }
 
-func (s *Store) Save(ctx context.Context, execID, node string, state *model.State) {
+func (s *Store) Save(ctx context.Context, snapshot *model.ExecutionSnapshot) {
+	if snapshot == nil {
+		return
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.data[execID] = &model.Task{
-		ExecutionID: execID,
-		NodeName:    node,
-		State:       state,
-	}
+	s.data[snapshot.ExecutionID] = snapshot
 }
 
-func (s *Store) Load(ctx context.Context, execID string) *model.Task {
+func (s *Store) Load(ctx context.Context, execID string) *model.ExecutionSnapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.data[execID]

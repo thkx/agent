@@ -9,6 +9,12 @@ type Task struct {
 	Retry       int // 已重试次数
 }
 
+type ExecutionSnapshot struct {
+	ExecutionID string
+	NodeName    string
+	State       *State
+}
+
 type TaskResult struct {
 	ExecutionID string
 	NodeName    string

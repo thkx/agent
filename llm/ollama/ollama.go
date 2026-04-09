@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/thkx/agent/llm"
@@ -45,16 +47,21 @@ func New(opts ...llm.Option) *ollama {
 }
 
 func (o *ollama) Generate(ctx context.Context, messages []llm.Message) (*llm.Response, error) {
-
 	reqBody := ollamaReq{
 		Model:    o.Config.Model,
 		Messages: messages,
 		Stream:   false,
 	}
 
-	b, _ := json.Marshal(reqBody)
+	b, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, err
+	}
 
-	req, _ := http.NewRequestWithContext(ctx, "POST", o.Config.BaseURL+"/api/chat", bytes.NewBuffer(b))
+	req, err := http.NewRequestWithContext(ctx, "POST", o.Config.BaseURL+"/api/chat", bytes.NewBuffer(b))
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -63,8 +70,15 @@ func (o *ollama) Generate(ctx context.Context, messages []llm.Message) (*llm.Res
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("ollama request failed: status=%d body=%s", resp.StatusCode, bytes.TrimSpace(body))
+	}
+
 	var r ollamaResp
-	json.NewDecoder(resp.Body).Decode(&r)
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return nil, fmt.Errorf("decode ollama response: %w", err)
+	}
 
 	return &llm.Response{
 		Content: r.Message.Content,

@@ -9,18 +9,28 @@ import (
 	"github.com/thkx/agent/model"
 	"github.com/thkx/agent/runtime"
 	"github.com/thkx/agent/tool"
+	"github.com/thkx/agent/toolbus"
+	"github.com/thkx/agent/toolruntime"
 )
 
 type Agent struct {
-	llm   llm.LLM
-	tools map[string]tool.Tool
-	rt    *runtime.Engine
+	llm          llm.LLM
+	toolRegistry *tool.Registry
+	toolRuntime  toolruntime.ToolRuntime
+	toolBus      toolbus.Caller
+	rt           *runtime.Engine
+	allowedTools map[string]bool
 }
 
 func New(rt *runtime.Engine) *Agent {
+	registry := tool.NewRegistry()
+	localRuntime := toolruntime.NewLocal(registry)
 	return &Agent{
-		tools: make(map[string]tool.Tool),
-		rt:    rt,
+		toolRegistry: registry,
+		toolRuntime:  localRuntime,
+		toolBus:      toolbus.New(localRuntime),
+		rt:           rt,
+		allowedTools: map[string]bool{},
 	}
 }
 
@@ -30,8 +40,25 @@ func (a *Agent) WithLLM(l llm.LLM) *Agent {
 }
 
 func (a *Agent) WithTools(ts ...tool.Tool) *Agent {
+	a.toolRegistry.Register(ts...)
 	for _, t := range ts {
-		a.tools[t.Name()] = t
+		a.allowedTools[t.Name()] = true
+	}
+	return a
+}
+
+func (a *Agent) WithToolRuntime(runtime toolruntime.ToolRuntime) *Agent {
+	if runtime == nil {
+		return a
+	}
+	a.toolRuntime = runtime
+	a.toolBus = toolbus.New(runtime)
+	return a
+}
+
+func (a *Agent) WithAllowedTools(names ...string) *Agent {
+	for _, name := range names {
+		a.allowedTools[name] = true
 	}
 	return a
 }
@@ -41,7 +68,6 @@ func (a *Agent) Run(ctx context.Context, input string) (string, error) {
 		Messages: []model.Message{
 			{Role: "user", Content: input},
 		},
-		Meta:   map[string]any{},
 		Counts: map[string]int{},
 	}
 
@@ -57,29 +83,36 @@ func (a *Agent) Run(ctx context.Context, input string) (string, error) {
 }
 
 func (a *Agent) buildGraph() *graph.Graph {
+	g := graph.New("agent", "end")
 
-	g := graph.New("llm", "end")
-
-	llmNode := &LLMNode{
-		llm:          a.llm,
-		allowedTools: map[string]bool{"get_price": true},
+	agentNode := &AgentNode{
+		runtime: NewRuntime(
+			NewLLMPlanner(
+				a.llm,
+				a.toolRegistry,
+				a.currentAllowedTools(),
+			),
+			a.toolBus,
+		),
 	}
-	toolNode := &ToolNode{tools: a.tools}
 	endNode := &EndNode{}
 
-	g.AddNode(llmNode)
-	g.AddNode(toolNode)
+	g.AddNode(agentNode)
 	g.AddNode(endNode)
-
-	// 条件路由
-	g.AddConditionalEdge("llm", func(s *model.State) (string, bool) {
-		if s.Meta["action"] == "tool" {
-			return "tool", true
-		}
-		return "end", true
-	})
-
-	g.AddEdge("tool", "llm")
+	g.AddEdge("agent", "end")
 
 	return g
+}
+
+func (a *Agent) currentAllowedTools() map[string]bool {
+	allowed := make(map[string]bool, len(a.allowedTools))
+	for name, ok := range a.allowedTools {
+		allowed[name] = ok
+	}
+	if len(allowed) == 0 {
+		for _, name := range a.toolRegistry.Names() {
+			allowed[name] = true
+		}
+	}
+	return allowed
 }

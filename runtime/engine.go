@@ -12,7 +12,7 @@ import (
 
 type (
 	Scheduler interface {
-		Schedule(context.Context, *model.Task) error
+		Submit(context.Context, *model.Task) error
 	}
 )
 
@@ -72,7 +72,7 @@ func (e *Engine) Run(ctx context.Context, execID string, g *graph.Graph, init *m
 		state = cp.State
 	}
 
-	err := e.scheduler.Schedule(ctx, &model.Task{
+	err := e.scheduler.Submit(ctx, &model.Task{
 		ExecutionID: execID,
 		NodeName:    current,
 		State:       state,
@@ -91,7 +91,11 @@ func (e *Engine) Run(ctx context.Context, execID string, g *graph.Graph, init *m
 			return res.Error
 		}
 
-		e.checkpoint.Save(ctx, execID, res.NodeName, res.State)
+		e.checkpoint.Save(ctx, &model.ExecutionSnapshot{
+			ExecutionID: execID,
+			NodeName:    res.NodeName,
+			State:       res.State,
+		})
 
 		if res.NodeName == g.End() {
 			return nil
@@ -102,7 +106,7 @@ func (e *Engine) Run(ctx context.Context, execID string, g *graph.Graph, init *m
 			return err
 		}
 
-		if err := e.scheduler.Schedule(ctx, &model.Task{
+		if err := e.scheduler.Submit(ctx, &model.Task{
 			ExecutionID: execID,
 			NodeName:    next,
 			State:       res.State,
