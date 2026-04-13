@@ -36,8 +36,9 @@ func (q *TaskQueue) PopTask(ctx context.Context) (*model.Task, error) {
 // RetryTask returns true when the task has been scheduled for retry.
 func (q *TaskQueue) RetryTask(t *model.Task) bool {
 	if t.Retry < model.MAX_RETRY {
-		t.Retry++
-		q.Queuer.(*MemoryQueue).Retry(t, t.Retry)
+		retryTask := t.Clone()
+		retryTask.Retry++
+		q.Queuer.(*MemoryQueue).Retry(retryTask, retryTask.Retry)
 		return true
 	}
 	return false

@@ -26,11 +26,12 @@ func (s *Store) Save(ctx context.Context, snapshot *model.ExecutionSnapshot) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.data[snapshot.ExecutionID] = snapshot
+	s.data[snapshot.ExecutionID] = snapshot.Clone()
 }
 
 func (s *Store) Load(ctx context.Context, execID string) *model.ExecutionSnapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.data[execID]
+	snapshot := s.data[execID]
+	return snapshot.Clone()
 }

@@ -1,0 +1,483 @@
+[
+  {
+    "Name": "engine.submit",
+    "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+    "NodeName": "agent",
+    "Input": {
+      "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+      "NodeName": "agent",
+      "State": {
+        "Messages": [
+          {
+            "Role": "user",
+            "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          }
+        ],
+        "Context": null,
+        "Action": "",
+        "PendingToolCall": null,
+        "PendingToolCalls": null,
+        "Counts": {}
+      },
+      "Retry": 0
+    },
+    "Output": {
+      "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+      "NodeName": "agent",
+      "State": {
+        "Messages": [
+          {
+            "Role": "user",
+            "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          }
+        ],
+        "Context": null,
+        "Action": "",
+        "PendingToolCall": null,
+        "PendingToolCalls": null,
+        "Counts": {}
+      },
+      "Retry": 0
+    },
+    "Error": "",
+    "StartedAt": "2026-04-11T21:24:35.348727+08:00",
+    "EndedAt": "2026-04-11T21:24:35.348728+08:00"
+  },
+  {
+    "Name": "agent.think",
+    "ExecutionID": "",
+    "NodeName": "",
+    "Input": {
+      "Messages": [
+        {
+          "Role": "user",
+          "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+          "ToolName": "",
+          "ToolCallID": "",
+          "ToolCall": null,
+          "ToolCalls": null
+        }
+      ],
+      "Context": null,
+      "Action": "",
+      "PendingToolCall": null,
+      "PendingToolCalls": null,
+      "Counts": {}
+    },
+    "Output": {
+      "Messages": [
+        {
+          "Role": "user",
+          "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+          "ToolName": "",
+          "ToolCallID": "",
+          "ToolCall": null,
+          "ToolCalls": null
+        }
+      ],
+      "Context": null,
+      "Action": "",
+      "PendingToolCall": null,
+      "PendingToolCalls": null,
+      "Counts": {}
+    },
+    "Error": "",
+    "StartedAt": "2026-04-11T21:24:35.349015+08:00",
+    "EndedAt": "2026-04-11T21:24:36.981812+08:00"
+  },
+  {
+    "Name": "worker.process_task",
+    "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+    "NodeName": "agent",
+    "Input": {
+      "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+      "NodeName": "agent",
+      "State": {
+        "Messages": [
+          {
+            "Role": "user",
+            "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          }
+        ],
+        "Context": null,
+        "Action": "",
+        "PendingToolCall": null,
+        "PendingToolCalls": null,
+        "Counts": {}
+      },
+      "Retry": 0
+    },
+    "Output": {
+      "Messages": [
+        {
+          "Role": "user",
+          "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+          "ToolName": "",
+          "ToolCallID": "",
+          "ToolCall": null,
+          "ToolCalls": null
+        },
+        {
+          "Role": "assistant",
+          "Content": "```json\n{\"tool\":\"get_price\", \"args\": [{\"key\":\"BTC\", \"value\": 1000000000.00}}])\n```",
+          "ToolName": "",
+          "ToolCallID": "",
+          "ToolCall": null,
+          "ToolCalls": null
+        }
+      ],
+      "Context": null,
+      "Action": "end",
+      "PendingToolCall": null,
+      "PendingToolCalls": null,
+      "Counts": {
+        "agent.llm": 1
+      }
+    },
+    "Error": "",
+    "StartedAt": "2026-04-11T21:24:35.349014+08:00",
+    "EndedAt": "2026-04-11T21:24:36.981818+08:00"
+  },
+  {
+    "Name": "engine.result",
+    "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+    "NodeName": "agent",
+    "Input": {
+      "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+      "NodeName": "agent",
+      "State": {
+        "Messages": [
+          {
+            "Role": "user",
+            "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          },
+          {
+            "Role": "assistant",
+            "Content": "```json\n{\"tool\":\"get_price\", \"args\": [{\"key\":\"BTC\", \"value\": 1000000000.00}}])\n```",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          }
+        ],
+        "Context": null,
+        "Action": "end",
+        "PendingToolCall": null,
+        "PendingToolCalls": null,
+        "Counts": {
+          "agent.llm": 1
+        }
+      },
+      "Error": null
+    },
+    "Output": {
+      "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+      "NodeName": "agent",
+      "State": {
+        "Messages": [
+          {
+            "Role": "user",
+            "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          },
+          {
+            "Role": "assistant",
+            "Content": "```json\n{\"tool\":\"get_price\", \"args\": [{\"key\":\"BTC\", \"value\": 1000000000.00}}])\n```",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          }
+        ],
+        "Context": null,
+        "Action": "end",
+        "PendingToolCall": null,
+        "PendingToolCalls": null,
+        "Counts": {
+          "agent.llm": 1
+        }
+      },
+      "Error": null
+    },
+    "Error": "",
+    "StartedAt": "2026-04-11T21:24:36.981824+08:00",
+    "EndedAt": "2026-04-11T21:24:36.981825+08:00"
+  },
+  {
+    "Name": "engine.transition",
+    "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+    "NodeName": "agent",
+    "Input": {
+      "Messages": [
+        {
+          "Role": "user",
+          "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+          "ToolName": "",
+          "ToolCallID": "",
+          "ToolCall": null,
+          "ToolCalls": null
+        },
+        {
+          "Role": "assistant",
+          "Content": "```json\n{\"tool\":\"get_price\", \"args\": [{\"key\":\"BTC\", \"value\": 1000000000.00}}])\n```",
+          "ToolName": "",
+          "ToolCallID": "",
+          "ToolCall": null,
+          "ToolCalls": null
+        }
+      ],
+      "Context": null,
+      "Action": "end",
+      "PendingToolCall": null,
+      "PendingToolCalls": null,
+      "Counts": {
+        "agent.llm": 1
+      }
+    },
+    "Output": {
+      "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+      "NodeName": "end",
+      "State": {
+        "Messages": [
+          {
+            "Role": "user",
+            "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          },
+          {
+            "Role": "assistant",
+            "Content": "```json\n{\"tool\":\"get_price\", \"args\": [{\"key\":\"BTC\", \"value\": 1000000000.00}}])\n```",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          }
+        ],
+        "Context": null,
+        "Action": "end",
+        "PendingToolCall": null,
+        "PendingToolCalls": null,
+        "Counts": {
+          "agent.llm": 1
+        }
+      },
+      "Retry": 0
+    },
+    "Error": "",
+    "StartedAt": "2026-04-11T21:24:36.981826+08:00",
+    "EndedAt": "2026-04-11T21:24:36.981829+08:00"
+  },
+  {
+    "Name": "worker.process_task",
+    "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+    "NodeName": "end",
+    "Input": {
+      "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+      "NodeName": "end",
+      "State": {
+        "Messages": [
+          {
+            "Role": "user",
+            "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          },
+          {
+            "Role": "assistant",
+            "Content": "```json\n{\"tool\":\"get_price\", \"args\": [{\"key\":\"BTC\", \"value\": 1000000000.00}}])\n```",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          }
+        ],
+        "Context": null,
+        "Action": "end",
+        "PendingToolCall": null,
+        "PendingToolCalls": null,
+        "Counts": {
+          "agent.llm": 1
+        }
+      },
+      "Retry": 0
+    },
+    "Output": {
+      "Messages": [
+        {
+          "Role": "user",
+          "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+          "ToolName": "",
+          "ToolCallID": "",
+          "ToolCall": null,
+          "ToolCalls": null
+        },
+        {
+          "Role": "assistant",
+          "Content": "```json\n{\"tool\":\"get_price\", \"args\": [{\"key\":\"BTC\", \"value\": 1000000000.00}}])\n```",
+          "ToolName": "",
+          "ToolCallID": "",
+          "ToolCall": null,
+          "ToolCalls": null
+        }
+      ],
+      "Context": null,
+      "Action": "end",
+      "PendingToolCall": null,
+      "PendingToolCalls": null,
+      "Counts": {
+        "agent.llm": 1
+      }
+    },
+    "Error": "",
+    "StartedAt": "2026-04-11T21:24:36.981849+08:00",
+    "EndedAt": "2026-04-11T21:24:36.981855+08:00"
+  },
+  {
+    "Name": "engine.result",
+    "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+    "NodeName": "end",
+    "Input": {
+      "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+      "NodeName": "end",
+      "State": {
+        "Messages": [
+          {
+            "Role": "user",
+            "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          },
+          {
+            "Role": "assistant",
+            "Content": "```json\n{\"tool\":\"get_price\", \"args\": [{\"key\":\"BTC\", \"value\": 1000000000.00}}])\n```",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          }
+        ],
+        "Context": null,
+        "Action": "end",
+        "PendingToolCall": null,
+        "PendingToolCalls": null,
+        "Counts": {
+          "agent.llm": 1
+        }
+      },
+      "Error": null
+    },
+    "Output": {
+      "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+      "NodeName": "end",
+      "State": {
+        "Messages": [
+          {
+            "Role": "user",
+            "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          },
+          {
+            "Role": "assistant",
+            "Content": "```json\n{\"tool\":\"get_price\", \"args\": [{\"key\":\"BTC\", \"value\": 1000000000.00}}])\n```",
+            "ToolName": "",
+            "ToolCallID": "",
+            "ToolCall": null,
+            "ToolCalls": null
+          }
+        ],
+        "Context": null,
+        "Action": "end",
+        "PendingToolCall": null,
+        "PendingToolCalls": null,
+        "Counts": {
+          "agent.llm": 1
+        }
+      },
+      "Error": null
+    },
+    "Error": "",
+    "StartedAt": "2026-04-11T21:24:36.981856+08:00",
+    "EndedAt": "2026-04-11T21:24:36.981857+08:00"
+  },
+  {
+    "Name": "engine.run",
+    "ExecutionID": "02965bc0-5df5-46dd-a2af-8466264b850c",
+    "NodeName": "",
+    "Input": {
+      "Messages": [
+        {
+          "Role": "user",
+          "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+          "ToolName": "",
+          "ToolCallID": "",
+          "ToolCall": null,
+          "ToolCalls": null
+        }
+      ],
+      "Context": null,
+      "Action": "",
+      "PendingToolCall": null,
+      "PendingToolCalls": null,
+      "Counts": {}
+    },
+    "Output": {
+      "Messages": [
+        {
+          "Role": "user",
+          "Content": "请同时获取 BTC 和 ETH 的价格与成交量",
+          "ToolName": "",
+          "ToolCallID": "",
+          "ToolCall": null,
+          "ToolCalls": null
+        },
+        {
+          "Role": "assistant",
+          "Content": "```json\n{\"tool\":\"get_price\", \"args\": [{\"key\":\"BTC\", \"value\": 1000000000.00}}])\n```",
+          "ToolName": "",
+          "ToolCallID": "",
+          "ToolCall": null,
+          "ToolCalls": null
+        }
+      ],
+      "Context": null,
+      "Action": "end",
+      "PendingToolCall": null,
+      "PendingToolCalls": null,
+      "Counts": {
+        "agent.llm": 1
+      }
+    },
+    "Error": "",
+    "StartedAt": "2026-04-11T21:24:35.348726+08:00",
+    "EndedAt": "2026-04-11T21:24:36.981858+08:00"
+  }
+]

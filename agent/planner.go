@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/thkx/agent/llm"
 	"github.com/thkx/agent/model"
 	"github.com/thkx/agent/tool"
@@ -16,9 +17,10 @@ type Planner interface {
 }
 
 type PlanResult struct {
-	Message  model.Message
-	Action   model.Action
-	ToolCall *llm.ToolCall
+	Message   model.Message
+	Action    model.Action
+	ToolCall  *llm.ToolCall
+	ToolCalls []llm.ToolCall
 }
 
 type LLMPlanner struct {
@@ -36,55 +38,119 @@ func NewLLMPlanner(llmClient llm.LLM, catalog tool.Catalog, allowedTools map[str
 }
 
 func (p *LLMPlanner) Plan(ctx context.Context, state *model.State) (*PlanResult, error) {
-	msgs := p.buildMessages(state)
-	resp, err := p.llm.Generate(ctx, msgs)
+	structured := p.supportsStructuredTools()
+	msgs := p.buildMessages(state, structured)
+	resp, err := p.generate(ctx, msgs)
 	if err != nil {
 		return nil, err
 	}
 
 	result := &PlanResult{
 		Message: model.Message{
-			Role:    "assistant",
-			Content: resp.Content,
+			Role:      "assistant",
+			Content:   resp.Content,
+			ToolCall:  cloneToolCall(resp.ToolCall),
+			ToolCalls: cloneToolCalls(resp.ToolCalls),
 		},
 		Action: model.ActionEnd,
 	}
 
+	if len(resp.ToolCalls) > 0 {
+		allowed := filterAllowedToolCalls(resp.ToolCalls, p.isAllowed)
+		ensureToolCallIDs(allowed)
+		if len(allowed) > 0 {
+			result.Action = model.ActionTool
+			result.ToolCalls = allowed
+			result.ToolCall = cloneToolCallPtrFromSlice(allowed)
+			result.Message.ToolCalls = cloneToolCalls(allowed)
+			result.Message.ToolCall = cloneToolCallPtrFromSlice(allowed)
+			return result, nil
+		}
+	}
+
 	if resp.ToolCall != nil && p.isAllowed(resp.ToolCall.Name) {
+		ensureToolCallID(resp.ToolCall)
 		result.Action = model.ActionTool
 		result.ToolCall = resp.ToolCall
+		result.ToolCalls = []llm.ToolCall{*cloneToolCall(resp.ToolCall)}
+		result.Message.ToolCall = cloneToolCall(resp.ToolCall)
+		result.Message.ToolCalls = cloneToolCalls(result.ToolCalls)
+		return result, nil
+	}
+
+	if toolCalls := p.parseToolCalls(resp.Content); len(toolCalls) > 0 {
+		result.Action = model.ActionTool
+		result.ToolCalls = toolCalls
+		result.ToolCall = cloneToolCallPtrFromSlice(toolCalls)
+		result.Message.ToolCalls = cloneToolCalls(toolCalls)
+		result.Message.ToolCall = cloneToolCallPtrFromSlice(toolCalls)
 		return result, nil
 	}
 
 	if tc := p.parseToolCall(resp.Content); tc != nil {
+		ensureToolCallID(tc)
 		result.Action = model.ActionTool
 		result.ToolCall = tc
+		result.ToolCalls = []llm.ToolCall{*cloneToolCall(tc)}
+		result.Message.ToolCall = cloneToolCall(tc)
+		result.Message.ToolCalls = cloneToolCalls(result.ToolCalls)
 	}
 
 	return result, nil
 }
 
-func (p *LLMPlanner) buildMessages(state *model.State) []llm.Message {
+func (p *LLMPlanner) buildMessages(state *model.State, structured bool) []llm.Message {
 	var msgs []llm.Message
-	if catalogPrompt := p.catalogPrompt(); catalogPrompt != "" {
+	if !structured {
+		if catalogPrompt := p.catalogPrompt(); catalogPrompt != "" {
+			msgs = append(msgs, llm.Message{
+				Role:    "system",
+				Content: catalogPrompt,
+			})
+		}
+		msgs = append(msgs, llm.Message{
+			Role: "system",
+			Content: "If a tool is needed, respond with JSON exactly like " +
+				`{"tool":"tool_name","args":{"key":"value"}}. ` +
+				"After you receive a tool result, answer the user directly with the final result instead of repeating tool JSON.",
+		})
+	} else {
 		msgs = append(msgs, llm.Message{
 			Role:    "system",
-			Content: catalogPrompt,
+			Content: "Use native tool calls when a tool is needed. After you receive a tool result, answer the user directly in plain text.",
 		})
 	}
-	msgs = append(msgs, llm.Message{
-		Role: "system",
-		Content: "If a tool is needed, respond with JSON exactly like " +
-			`{"tool":"tool_name","args":{"key":"value"}}. ` +
-			"After you receive a tool result, answer the user directly with the final result instead of repeating tool JSON.",
-	})
 	for _, m := range state.Messages {
-		msgs = append(msgs, llm.Message{
-			Role:    m.Role,
-			Content: m.Content,
-		})
+		msg := llm.Message{
+			Role:       m.Role,
+			Content:    m.Content,
+			ToolName:   m.ToolName,
+			ToolCallID: m.ToolCallID,
+		}
+		if m.ToolCall != nil {
+			msg.ToolCalls = []llm.ToolCall{*cloneToolCall(m.ToolCall)}
+		}
+		if len(m.ToolCalls) > 0 {
+			msg.ToolCalls = cloneToolCalls(m.ToolCalls)
+		}
+		msgs = append(msgs, msg)
 	}
 	return msgs
+}
+
+func (p *LLMPlanner) generate(ctx context.Context, msgs []llm.Message) (*llm.Response, error) {
+	if caller, ok := p.llm.(llm.StructuredToolCaller); ok {
+		defs := p.availableDefinitions()
+		if len(defs) > 0 {
+			return caller.GenerateWithTools(ctx, msgs, p.toLLMTools(defs))
+		}
+	}
+	return p.llm.Generate(ctx, msgs)
+}
+
+func (p *LLMPlanner) supportsStructuredTools() bool {
+	caller, ok := p.llm.(llm.StructuredToolCaller)
+	return ok && caller != nil && len(p.availableDefinitions()) > 0
 }
 
 func (p *LLMPlanner) isAllowed(name string) bool {
@@ -140,6 +206,48 @@ func (p *LLMPlanner) availableDefinitions() []tool.Definition {
 	return filtered
 }
 
+func (p *LLMPlanner) toLLMTools(defs []tool.Definition) []llm.ToolDefinition {
+	out := make([]llm.ToolDefinition, 0, len(defs))
+	for _, def := range defs {
+		out = append(out, llm.ToolDefinition{
+			Name:        def.Name,
+			Description: def.Description,
+			Parameters:  def.Schema.JSON(),
+		})
+	}
+	return out
+}
+
+func (p *LLMPlanner) parseToolCalls(content string) []llm.ToolCall {
+	normalized := normalizeJSONContent(content)
+	if normalized == "" {
+		return nil
+	}
+
+	var payload struct {
+		ToolCalls []struct {
+			Tool string         `json:"tool"`
+			Args map[string]any `json:"args"`
+		} `json:"tool_calls"`
+	}
+	if err := json.Unmarshal([]byte(normalized), &payload); err != nil || len(payload.ToolCalls) == 0 {
+		return nil
+	}
+
+	parsed := make([]llm.ToolCall, 0, len(payload.ToolCalls))
+	for _, item := range payload.ToolCalls {
+		if item.Tool == "" || !p.isAllowed(item.Tool) {
+			return nil
+		}
+		if item.Args == nil {
+			item.Args = map[string]any{}
+		}
+		parsed = append(parsed, llm.ToolCall{Name: item.Tool, Args: item.Args})
+	}
+	ensureToolCallIDs(parsed)
+	return parsed
+}
+
 func (p *LLMPlanner) parseToolCall(content string) *llm.ToolCall {
 	normalized := normalizeJSONContent(content)
 	if normalized == "" {
@@ -147,14 +255,22 @@ func (p *LLMPlanner) parseToolCall(content string) *llm.ToolCall {
 	}
 
 	var standard struct {
-		Tool string         `json:"tool"`
-		Args map[string]any `json:"args"`
+		Tool      string         `json:"tool"`
+		Args      map[string]any `json:"args"`
+		ToolCalls []struct {
+			Tool string         `json:"tool"`
+			Args map[string]any `json:"args"`
+		} `json:"tool_calls"`
 	}
-	if err := json.Unmarshal([]byte(normalized), &standard); err == nil && standard.Tool != "" && p.isAllowed(standard.Tool) {
-		if standard.Args == nil {
-			standard.Args = map[string]any{}
+	if err := json.Unmarshal([]byte(normalized), &standard); err == nil {
+		if standard.Tool != "" && p.isAllowed(standard.Tool) {
+			if standard.Args == nil {
+				standard.Args = map[string]any{}
+			}
+			call := &llm.ToolCall{Name: standard.Tool, Args: standard.Args}
+			ensureToolCallID(call)
+			return call
 		}
-		return &llm.ToolCall{Name: standard.Tool, Args: standard.Args}
 	}
 
 	var generic map[string]any
@@ -228,4 +344,66 @@ func plannerErrorMessage(err error) model.Message {
 		Role:    "system",
 		Content: fmt.Sprintf("LLM error: %v", err),
 	}
+}
+
+func cloneToolCall(call *llm.ToolCall) *llm.ToolCall {
+	if call == nil {
+		return nil
+	}
+
+	cloned := &llm.ToolCall{
+		ID:   call.ID,
+		Name: call.Name,
+	}
+	if call.Args != nil {
+		cloned.Args = make(map[string]any, len(call.Args))
+		for k, v := range call.Args {
+			cloned.Args[k] = v
+		}
+	}
+	return cloned
+}
+
+func cloneToolCalls(calls []llm.ToolCall) []llm.ToolCall {
+	if len(calls) == 0 {
+		return nil
+	}
+	cloned := make([]llm.ToolCall, len(calls))
+	for i, call := range calls {
+		cloned[i] = *cloneToolCall(&call)
+	}
+	return cloned
+}
+
+func cloneToolCallPtrFromSlice(calls []llm.ToolCall) *llm.ToolCall {
+	if len(calls) == 0 {
+		return nil
+	}
+	return cloneToolCall(&calls[0])
+}
+
+func filterAllowedToolCalls(calls []llm.ToolCall, isAllowed func(string) bool) []llm.ToolCall {
+	filtered := make([]llm.ToolCall, 0, len(calls))
+	for _, call := range calls {
+		if !isAllowed(call.Name) {
+			continue
+		}
+		filtered = append(filtered, *cloneToolCall(&call))
+	}
+	return filtered
+}
+
+func ensureToolCallIDs(calls []llm.ToolCall) {
+	for i := range calls {
+		if calls[i].ID == "" {
+			calls[i].ID = "call_" + uuid.NewString()
+		}
+	}
+}
+
+func ensureToolCallID(call *llm.ToolCall) {
+	if call == nil || call.ID != "" {
+		return
+	}
+	call.ID = "call_" + uuid.NewString()
 }

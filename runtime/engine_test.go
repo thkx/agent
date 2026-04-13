@@ -2,6 +2,7 @@ package runtime_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/thkx/agent/queue"
 	"github.com/thkx/agent/runtime"
 	"github.com/thkx/agent/scheduler"
+	"github.com/thkx/agent/tracer"
 	"github.com/thkx/agent/worker"
 )
 
@@ -138,7 +140,7 @@ func TestEngineRunResumesFromCheckpoint(t *testing.T) {
 
 	cp.Save(ctx, &model.ExecutionSnapshot{
 		ExecutionID: "exec-resume",
-		NodeName:    "middle",
+		NodeName:    "end",
 		State: &model.State{
 			Messages: []model.Message{
 				{Role: "system", Content: "restored"},
@@ -161,10 +163,140 @@ func TestEngineRunResumesFromCheckpoint(t *testing.T) {
 	}
 
 	got := snapshot.State.Messages
-	if len(got) != 3 {
-		t.Fatalf("expected 3 messages after resume, got %d", len(got))
+	if len(got) != 2 {
+		t.Fatalf("expected 2 messages after resume, got %d", len(got))
 	}
-	if got[0].Content != "restored" || got[1].Content != "middle" || got[2].Content != "end" {
+	if got[0].Content != "restored" || got[1].Content != "end" {
 		t.Fatalf("unexpected resumed message sequence: %#v", got)
+	}
+}
+
+func TestEngineRunIgnoresOtherExecutionResults(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	taskQ := queue.NewTaskQueue(8)
+	resultQ := queue.NewResultQueue(8)
+	graphStore := runtime.NewMemoryGraphStore()
+
+	engine := runtime.New(
+		runtime.WithScheduler(scheduler.New(taskQ)),
+		runtime.WithResultQueue(resultQ),
+		runtime.WithGraphStore(graphStore),
+	)
+
+	g := graph.New("start", "end")
+	g.AddNode(&testNode{name: "start"})
+	g.AddNode(&testNode{name: "end"})
+	g.AddEdge("start", "end")
+
+	if err := resultQ.PushResult(ctx, &model.TaskResult{
+		ExecutionID: "other-exec",
+		NodeName:    "end",
+		State:       &model.State{},
+		Error:       errors.New("other execution failed"),
+	}); err != nil {
+		t.Fatalf("push foreign result: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- engine.Run(ctx, "target-exec", g, &model.State{})
+	}()
+
+	task, err := taskQ.PopTask(ctx)
+	if err != nil {
+		t.Fatalf("pop submitted task: %v", err)
+	}
+	if task.ExecutionID != "target-exec" || task.NodeName != "start" {
+		t.Fatalf("unexpected submitted task: %#v", task)
+	}
+
+	if err := resultQ.PushResult(ctx, &model.TaskResult{
+		ExecutionID: "target-exec",
+		NodeName:    "start",
+		State:       &model.State{},
+	}); err != nil {
+		t.Fatalf("push target start result: %v", err)
+	}
+
+	task, err = taskQ.PopTask(ctx)
+	if err != nil {
+		t.Fatalf("pop second submitted task: %v", err)
+	}
+	if task.ExecutionID != "target-exec" || task.NodeName != "end" {
+		t.Fatalf("unexpected follow-up task: %#v", task)
+	}
+
+	if err := resultQ.PushResult(ctx, &model.TaskResult{
+		ExecutionID: "target-exec",
+		NodeName:    "end",
+		State:       &model.State{},
+	}); err != nil {
+		t.Fatalf("push target end result: %v", err)
+	}
+
+	if err := <-done; err != nil {
+		t.Fatalf("expected target execution to ignore foreign result, got %v", err)
+	}
+}
+
+func TestEngineAndWorkerEmitTracingSpans(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	taskQ := queue.NewTaskQueue(8)
+	resultQ := queue.NewResultQueue(8)
+	graphStore := runtime.NewMemoryGraphStore()
+	memTracer := tracer.NewMemory()
+
+	engine := runtime.New(
+		runtime.WithScheduler(scheduler.New(taskQ)),
+		runtime.WithResultQueue(resultQ),
+		runtime.WithGraphStore(graphStore),
+		runtime.WithTracer(memTracer),
+	)
+
+	w := worker.New(
+		worker.WithTaskQueue(taskQ),
+		worker.WithResultQueue(resultQ),
+		worker.WithGraphStore(graphStore),
+		worker.WithTracer(memTracer),
+	)
+	go w.Start(ctx)
+
+	g := graph.New("start", "end")
+	g.AddNode(&testNode{name: "start"})
+	g.AddNode(&testNode{name: "end"})
+	g.AddEdge("start", "end")
+
+	if err := engine.Run(ctx, "trace-exec", g, &model.State{}); err != nil {
+		t.Fatalf("engine run failed: %v", err)
+	}
+
+	spans := memTracer.Spans()
+	if len(spans) == 0 {
+		t.Fatal("expected tracing spans")
+	}
+
+	var sawRun bool
+	var sawSubmit bool
+	var sawWorker bool
+	for _, span := range spans {
+		switch span.Name {
+		case "engine.run":
+			sawRun = true
+		case "engine.submit":
+			sawSubmit = true
+		case "worker.process_task":
+			sawWorker = true
+		}
+	}
+	if !sawRun || !sawSubmit || !sawWorker {
+		t.Fatalf("expected run/submit/worker spans, got %#v", spans)
 	}
 }

@@ -27,7 +27,7 @@ func (s *MemoryGraphStore) Save(execID string, g *graph.Graph) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.graph[execID] = g
+	s.graph[execID] = g.Clone()
 }
 
 func (s *MemoryGraphStore) Load(execID string) (*graph.Graph, bool) {
@@ -35,7 +35,7 @@ func (s *MemoryGraphStore) Load(execID string) (*graph.Graph, bool) {
 	defer s.mu.RUnlock()
 
 	g, ok := s.graph[execID]
-	return g, ok
+	return g.Clone(), ok
 }
 
 func (s *MemoryGraphStore) Delete(execID string) {

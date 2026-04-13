@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/thkx/agent/agent"
-	exampletools "github.com/thkx/agent/examples/04/tools"
+	exampletools "github.com/thkx/agent/examples/tools"
 	"github.com/thkx/agent/llm"
 	"github.com/thkx/agent/llm/ollama"
 	"github.com/thkx/agent/queue"
@@ -47,6 +47,9 @@ func main() {
 	ag := agent.New(rt).
 		WithLLM(stableLLM).
 		WithTools(&exampletools.PriceTool{})
+
+	// 添加权限到上下文
+	ctx = context.WithValue(ctx, "user_permissions", []string{"read"})
 
 	result, err := ag.Run(ctx, "请获取 BTC 价格")
 	if err != nil {

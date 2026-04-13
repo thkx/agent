@@ -3,6 +3,7 @@ package worker
 import (
 	"github.com/thkx/agent/queue"
 	"github.com/thkx/agent/runtime"
+	"github.com/thkx/agent/tracer"
 )
 
 type Option func(*Worker)
@@ -22,5 +23,17 @@ func WithResultQueue(q *queue.ResultQueue) Option {
 func WithTaskQueue(q *queue.TaskQueue) Option {
 	return func(e *Worker) {
 		e.taskQueue = q
+	}
+}
+
+func WithConcurrency(n int) Option {
+	return func(e *Worker) {
+		e.concurrency = n
+	}
+}
+
+func WithTracer(t tracer.Tracer) Option {
+	return func(e *Worker) {
+		e.tracer = t
 	}
 }

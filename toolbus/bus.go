@@ -2,6 +2,7 @@ package toolbus
 
 import (
 	"context"
+	"log"
 
 	"github.com/thkx/agent/llm"
 	"github.com/thkx/agent/toolruntime"
@@ -20,6 +21,7 @@ func New(runtime toolruntime.ToolRuntime) *ToolBus {
 }
 
 func (b *ToolBus) Call(ctx context.Context, call *llm.ToolCall) (any, error) {
+	log.Println("ToolBus Call")
 	result, err := b.runtime.Execute(ctx, toolruntime.ToolCall{
 		Name:  call.Name,
 		Input: call.Args,

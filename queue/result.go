@@ -16,7 +16,7 @@ func NewResultQueue(size int) *ResultQueue {
 }
 
 func (q *ResultQueue) PushResult(ctx context.Context, r *model.TaskResult) error {
-	return q.q.Push(ctx, r)
+	return q.q.Push(ctx, r.Clone())
 }
 
 func (q *ResultQueue) PopResult(ctx context.Context) (*model.TaskResult, error) {

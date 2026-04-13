@@ -11,6 +11,7 @@ import (
 	"github.com/thkx/agent/tool"
 	"github.com/thkx/agent/toolbus"
 	"github.com/thkx/agent/toolruntime"
+	"github.com/thkx/agent/tracer"
 )
 
 type Agent struct {
@@ -20,6 +21,10 @@ type Agent struct {
 	toolBus      toolbus.Caller
 	rt           *runtime.Engine
 	allowedTools map[string]bool
+	tracer       tracer.Tracer
+	// 新增：插件管理
+	llmPlugins  map[string]llm.LLM
+	toolPlugins map[string]tool.Tool
 }
 
 func New(rt *runtime.Engine) *Agent {
@@ -31,6 +36,9 @@ func New(rt *runtime.Engine) *Agent {
 		toolBus:      toolbus.New(localRuntime),
 		rt:           rt,
 		allowedTools: map[string]bool{},
+		tracer:       tracer.NewNoop(),
+		llmPlugins:   make(map[string]llm.LLM),
+		toolPlugins:  make(map[string]tool.Tool),
 	}
 }
 
@@ -53,6 +61,10 @@ func (a *Agent) WithToolRuntime(runtime toolruntime.ToolRuntime) *Agent {
 	}
 	a.toolRuntime = runtime
 	a.toolBus = toolbus.New(runtime)
+	// 如果是 LocalRuntime，设置 tracer
+	if lr, ok := runtime.(*toolruntime.LocalRuntime); ok {
+		lr.WithTracer(a.tracer)
+	}
 	return a
 }
 
@@ -61,6 +73,23 @@ func (a *Agent) WithAllowedTools(names ...string) *Agent {
 		a.allowedTools[name] = true
 	}
 	return a
+}
+
+func (a *Agent) WithTracer(t tracer.Tracer) *Agent {
+	if t != nil {
+		a.tracer = t
+	}
+	return a
+}
+
+func (a *Agent) RegisterLLM(name string, l llm.LLM) {
+	a.llmPlugins[name] = l
+}
+
+func (a *Agent) RegisterTool(name string, t tool.Tool) {
+	a.toolPlugins[name] = t
+	a.toolRegistry.Register(t)
+	a.allowedTools[t.Name()] = true
 }
 
 func (a *Agent) Run(ctx context.Context, input string) (string, error) {
@@ -72,10 +101,21 @@ func (a *Agent) Run(ctx context.Context, input string) (string, error) {
 	}
 
 	execID := uuid.New().String()
+	ctx, endSpan := a.tracer.StartSpan(ctx, tracer.Span{
+		Name:        "agent_run",
+		ExecutionID: execID,
+		NodeName:    "agent",
+		Input:       input,
+	})
+	defer func() {
+		endSpan(state.Messages[len(state.Messages)-1].Content, nil)
+	}()
+
 	g := a.buildGraph()
 
 	err := a.rt.Run(ctx, execID, g, state)
 	if err != nil {
+		endSpan("", err)
 		return "", err
 	}
 
@@ -85,21 +125,42 @@ func (a *Agent) Run(ctx context.Context, input string) (string, error) {
 func (a *Agent) buildGraph() *graph.Graph {
 	g := graph.New("agent", "end")
 
-	agentNode := &AgentNode{
-		runtime: NewRuntime(
-			NewLLMPlanner(
-				a.llm,
-				a.toolRegistry,
-				a.currentAllowedTools(),
-			),
-			a.toolBus,
+	rt := NewRuntime(
+		NewLLMPlanner(
+			a.llm,
+			a.toolRegistry,
+			a.currentAllowedTools(),
 		),
-	}
+		a.toolBus,
+		a.tracer,
+	)
+	agentNode := &AgentNode{runtime: rt}
+	toolNode := &ToolNode{runtime: rt}
 	endNode := &EndNode{}
 
 	g.AddNode(agentNode)
+	g.AddNode(toolNode)
 	g.AddNode(endNode)
-	g.AddEdge("agent", "end")
+	g.AddConditionalEdge("agent", func(state *model.State) (string, bool) {
+		switch state.Action {
+		case model.ActionTool:
+			return "tool", true
+		case model.ActionEnd, model.ActionNone:
+			return "end", true
+		default:
+			return "", false
+		}
+	})
+	g.AddConditionalEdge("tool", func(state *model.State) (string, bool) {
+		switch state.Action {
+		case model.ActionLLM:
+			return "agent", true
+		case model.ActionEnd, model.ActionNone:
+			return "end", true
+		default:
+			return "", false
+		}
+	})
 
 	return g
 }

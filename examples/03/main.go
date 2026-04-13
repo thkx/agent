@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/thkx/agent/agent"
-	exampletools "github.com/thkx/agent/examples/03/tools"
+	exampletools "github.com/thkx/agent/examples/tools"
 	"github.com/thkx/agent/llm"
 	"github.com/thkx/agent/llm/ollama"
 	"github.com/thkx/agent/queue"

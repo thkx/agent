@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/thkx/agent/tool"
 )
@@ -27,7 +28,7 @@ func (t *PriceTool) Schema() tool.Schema {
 				Description: "Crypto symbol like BTC or ETH",
 			},
 		},
-		Required: []string{"symbol"},
+		// Required: []string{"symbol"},
 	}
 }
 
@@ -41,4 +42,12 @@ func (t *PriceTool) Invoke(ctx context.Context, input any) (any, error) {
 	}
 
 	return fmt.Sprintf("%s price is 65000 (mock)", strings.ToUpper(symbol)), nil
+}
+
+func (t *PriceTool) Timeout() time.Duration {
+	return 10 * time.Second
+}
+
+func (t *PriceTool) Permissions() []string {
+	return []string{"read"}
 }

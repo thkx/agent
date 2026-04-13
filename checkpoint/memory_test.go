@@ -33,7 +33,10 @@ func TestStoreSaveAndLoadSnapshot(t *testing.T) {
 	if got.NodeName != snapshot.NodeName {
 		t.Fatalf("expected node name %q, got %q", snapshot.NodeName, got.NodeName)
 	}
-	if got.State != snapshot.State {
-		t.Fatal("expected stored state pointer to match original snapshot state")
+	if got.State == snapshot.State {
+		t.Fatal("expected checkpoint load to return a cloned state")
+	}
+	if len(got.State.Messages) != 1 || got.State.Messages[0].Content != "running" {
+		t.Fatalf("unexpected cloned state contents: %#v", got.State.Messages)
 	}
 }

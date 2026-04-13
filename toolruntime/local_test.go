@@ -3,6 +3,7 @@ package toolruntime
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/thkx/agent/tool"
 )
@@ -31,6 +32,14 @@ func (t *stubTool) Invoke(ctx context.Context, input any) (any, error) {
 		return t.run(input)
 	}
 	return nil, nil
+}
+
+func (t *stubTool) Timeout() time.Duration {
+	return 10 * time.Second
+}
+
+func (t *stubTool) Permissions() []string {
+	return []string{"read"}
 }
 
 func TestLocalRuntimeExecuteAndList(t *testing.T) {
